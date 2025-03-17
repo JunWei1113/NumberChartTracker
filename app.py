@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 from datetime import datetime
+import io
+import base64
 
 # Initialize session state for storing data
 if 'data' not in st.session_state:
@@ -83,6 +85,15 @@ if not st.session_state.data.empty:
                       title='數值變化趨勢')
     st.plotly_chart(fig_time, use_container_width=True)
 
+    # Export time series chart
+    time_series_html = fig_time.to_html()
+    st.download_button(
+        label="下載時間序列圖表",
+        data=time_series_html,
+        file_name="time_series_chart.html",
+        mime="text/html"
+    )
+
     # Distribution charts
     st.subheader('數值分布')
     col1, col2 = st.columns(2)
@@ -95,6 +106,15 @@ if not st.session_state.data.empty:
                                      nbins=20)
             st.plotly_chart(fig_glucose, use_container_width=True)
 
+            # Export glucose distribution chart
+            glucose_dist_html = fig_glucose.to_html()
+            st.download_button(
+                label="下載血糖分布圖",
+                data=glucose_dist_html,
+                file_name="glucose_distribution.html",
+                mime="text/html"
+            )
+
     with col2:
         if not insulin_data.empty:
             fig_insulin = px.histogram(insulin_data,
@@ -103,8 +123,28 @@ if not st.session_state.data.empty:
                                      nbins=20)
             st.plotly_chart(fig_insulin, use_container_width=True)
 
-    # Raw data display
+            # Export insulin distribution chart
+            insulin_dist_html = fig_insulin.to_html()
+            st.download_button(
+                label="下載胰島素分布圖",
+                data=insulin_dist_html,
+                file_name="insulin_distribution.html",
+                mime="text/html"
+            )
+
+    # Raw data display and export
     st.subheader('記錄數據')
+
+    # Prepare CSV download
+    csv = st.session_state.data.to_csv(index=False)
+    st.download_button(
+        label="下載CSV數據檔案",
+        data=csv,
+        file_name="health_data.csv",
+        mime="text/csv"
+    )
+
+    # Display data table
     st.dataframe(st.session_state.data.sort_values('timestamp',
                                                   ascending=False),
                 hide_index=True,
