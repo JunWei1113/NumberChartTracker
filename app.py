@@ -6,66 +6,113 @@ from datetime import datetime
 
 # Initialize session state for storing data
 if 'data' not in st.session_state:
-    st.session_state.data = pd.DataFrame(columns=['timestamp', 'value'])
+    st.session_state.data = pd.DataFrame(columns=['timestamp', 'type', 'value'])
 
 # Page title and description
-st.title('Data Recording & Visualization Tool')
-st.write('Enter numerical values to record and visualize them in real-time')
+st.title('血糖與胰島素劑量記錄系統')
+st.write('記錄血糖值和胰島素劑量的變化')
 
 # Input section
 with st.container():
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 2, 1])
+
     with col1:
-        new_value = st.number_input('Enter a numerical value:', key='value_input')
+        glucose_value = st.number_input('血糖值 (mg/dL):', 
+                                      key='glucose_input',
+                                      min_value=0.0)
     with col2:
-        if st.button('Record Value'):
-            # Add new value to the dataframe
-            new_row = pd.DataFrame({
-                'timestamp': [datetime.now()],
-                'value': [new_value]
+        insulin_value = st.number_input('胰島素劑量 (單位):', 
+                                      key='insulin_input',
+                                      min_value=0.0)
+    with col3:
+        if st.button('送出資料'):
+            # Add new values to the dataframe
+            new_rows = pd.DataFrame({
+                'timestamp': [datetime.now(), datetime.now()],
+                'type': ['血糖', '胰島素'],
+                'value': [glucose_value, insulin_value]
             })
-            st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+            st.session_state.data = pd.concat([st.session_state.data, new_rows],
+                                            ignore_index=True)
             st.rerun()
+
+# Display warning for glucose levels
+if not st.session_state.data.empty:
+    latest_glucose = st.session_state.data[st.session_state.data['type'] == '血糖']['value'].iloc[-1] \
+        if len(st.session_state.data[st.session_state.data['type'] == '血糖']) > 0 else None
+
+    if latest_glucose is not None:
+        if latest_glucose < 90:
+            st.warning('⚠️ 警告：血糖過低！')
+        elif latest_glucose > 120:
+            st.warning('⚠️ 警告：血糖過高！')
+        else:
+            st.success('✅ 血糖在正常範圍內')
 
 # Display data and visualizations if we have data
 if not st.session_state.data.empty:
     # Statistical information
-    st.subheader('Statistical Summary')
-    col1, col2, col3, col4 = st.columns(4)
+    st.subheader('統計摘要')
+
+    # Create separate statistics for glucose and insulin
+    glucose_data = st.session_state.data[st.session_state.data['type'] == '血糖']
+    insulin_data = st.session_state.data[st.session_state.data['type'] == '胰島素']
+
+    col1, col2 = st.columns(2)
+
     with col1:
-        st.metric('Mean', f"{st.session_state.data['value'].mean():.2f}")
+        st.markdown('**血糖數據**')
+        if not glucose_data.empty:
+            st.metric('平均值', f"{glucose_data['value'].mean():.1f} mg/dL")
+            st.metric('最新值', f"{glucose_data['value'].iloc[-1]:.1f} mg/dL")
+            st.metric('記錄筆數', len(glucose_data))
+
     with col2:
-        st.metric('Median', f"{st.session_state.data['value'].median():.2f}")
-    with col3:
-        st.metric('Standard Dev', f"{st.session_state.data['value'].std():.2f}")
-    with col4:
-        st.metric('Count', len(st.session_state.data))
+        st.markdown('**胰島素數據**')
+        if not insulin_data.empty:
+            st.metric('平均值', f"{insulin_data['value'].mean():.1f} 單位")
+            st.metric('最新值', f"{insulin_data['value'].iloc[-1]:.1f} 單位")
+            st.metric('記錄筆數', len(insulin_data))
 
     # Time series chart
-    st.subheader('Time Series Visualization')
-    fig_time = px.line(st.session_state.data, 
-                       x='timestamp', 
-                       y='value',
-                       title='Values Over Time')
+    st.subheader('時間序列視覺化')
+    fig_time = px.line(st.session_state.data,
+                      x='timestamp',
+                      y='value',
+                      color='type',
+                      title='數值變化趨勢')
     st.plotly_chart(fig_time, use_container_width=True)
 
-    # Distribution histogram
-    st.subheader('Value Distribution')
-    fig_dist = px.histogram(st.session_state.data, 
-                           x='value',
-                           title='Value Distribution',
-                           nbins=20)
-    st.plotly_chart(fig_dist, use_container_width=True)
+    # Distribution charts
+    st.subheader('數值分布')
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if not glucose_data.empty:
+            fig_glucose = px.histogram(glucose_data,
+                                     x='value',
+                                     title='血糖值分布',
+                                     nbins=20)
+            st.plotly_chart(fig_glucose, use_container_width=True)
+
+    with col2:
+        if not insulin_data.empty:
+            fig_insulin = px.histogram(insulin_data,
+                                     x='value',
+                                     title='胰島素劑量分布',
+                                     nbins=20)
+            st.plotly_chart(fig_insulin, use_container_width=True)
 
     # Raw data display
-    st.subheader('Recorded Data')
-    st.dataframe(st.session_state.data.sort_values('timestamp', ascending=False),
-                 hide_index=True,
-                 use_container_width=True)
+    st.subheader('記錄數據')
+    st.dataframe(st.session_state.data.sort_values('timestamp',
+                                                  ascending=False),
+                hide_index=True,
+                use_container_width=True)
 
     # Clear data button
-    if st.button('Clear All Data'):
-        st.session_state.data = pd.DataFrame(columns=['timestamp', 'value'])
+    if st.button('清除所有數據'):
+        st.session_state.data = pd.DataFrame(columns=['timestamp', 'type', 'value'])
         st.rerun()
 else:
-    st.info('No data recorded yet. Start by entering values above.')
+    st.info('尚未有記錄的數據。請在上方輸入數值開始記錄。')
